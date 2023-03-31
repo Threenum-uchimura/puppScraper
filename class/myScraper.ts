@@ -22,7 +22,7 @@ const DISABLE_GPU: string = '--disable-gpu'; // no gpu
 const NO_FIRST_RUN: string = '--no-first-run'; // no first run
 const NO_ZYGOTE: string = '--no-zygote'; // no zygote
 const DEF_USER_AGENT: string = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36'; // useragent
-
+const WAIT_TIME: number = 3000;
 // define modules
 import puppeteer from 'puppeteer-core'; // Puppeteer for scraping
 import path from 'path'; // path
@@ -32,6 +32,7 @@ import * as fs from 'fs'; // fs
 // puppeteer options
 interface puppOption {
   headless: boolean; // display mode
+  defaultViewport: null,
   executablePath: string; // chrome.exe path
   ignoreDefaultArgs: string[]; // ignore extensions
   args: string[]; // args
@@ -44,7 +45,6 @@ export class Scrape {
   static page: puppeteer.Page; // static page
 
   private _result: boolean; // scrape result
-  private _promise: Promise<void>; // scraped promise
 
   // constractor
   constructor() {
@@ -58,9 +58,10 @@ export class Scrape {
       try {
         const puppOptions: puppOption = {
           headless: true, // no display mode
-          executablePath: await getChromePath(), // chrome.exe path
-          ignoreDefaultArgs: [DISABLE_EXTENSIONS], // ignore extensions
-          args: [NO_SANDBOX, DISABLE_SANDBOX, DISABLE_DEV_SHM, DISABLE_GPU, NO_FIRST_RUN, NO_ZYGOTE, ALLOW_INSECURE, IGNORE_CERT_ERROR], // args
+          defaultViewport: null,
+          executablePath: getChromePath(), // chrome.exe path
+          ignoreDefaultArgs: [], // ignore extensions
+          args: [], // args
         }
         // lauch browser
         Scrape.browser = await puppeteer.launch(puppOptions);
@@ -104,8 +105,8 @@ export class Scrape {
   doClick(elem: string): Promise<void> {
     return new Promise(async (resolve, reject) => {
       try {
-        // wait for loading
-        await Scrape.page.doWaitSelector(elem);
+        // wait for loading selector
+        await Scrape.page.waitForSelector(elem, { timeout: WAIT_TIME });
         // click target element
         await Scrape.page.click(elem);
         // resolved
@@ -124,8 +125,8 @@ export class Scrape {
   doType(elem: string, value: string): Promise<void> {
     return new Promise(async (resolve, reject) => {
       try {
-        // wait for loading
-        await Scrape.page.doWaitSelector(elem);
+        // wait for loading selector
+        await Scrape.page.waitForSelector(elem, { timeout: WAIT_TIME });
         // type element on specified value
         await Scrape.page.type(elem, value);
         // resolved
@@ -144,8 +145,8 @@ export class Scrape {
   doSelect(elem: string): Promise<void> {
     return new Promise(async (resolve, reject) => {
       try {
-        // wait for loading
-        await Scrape.page.doWaitSelector(elem);
+        // wait for loading selector
+        await Scrape.page.waitForSelector(elem, { timeout: WAIT_TIME });
         // select element
         await Scrape.page.select(elem);
         // resolved
@@ -182,8 +183,8 @@ export class Scrape {
   doSingleEval(selector: string, property: string): Promise<string> {
     return new Promise(async (resolve, reject) => {
       try {
-        // wait for loading
-        await Scrape.page.doWaitSelector(selector);
+        // wait for loading selector
+        await Scrape.page.waitForSelector(selector, { timeout: WAIT_TIME });
         // target item
         const item: any = await Scrape.page.$(selector);
 
@@ -214,8 +215,8 @@ export class Scrape {
       try {
         // data set
         let datas: string[] = [];
-        // wait for loading
-        await Scrape.page.doWaitSelector(selector);
+        // wait for loading selector
+        await Scrape.page.waitForSelector(selector, { timeout: WAIT_TIME });
         // target list
         const list: any = await Scrape.page.$$(selector);
 
@@ -298,6 +299,24 @@ export class Scrape {
         await Scrape.browser.close();
         // resolved
         resolve();
+
+      } catch (e: unknown) {
+        // error
+        outErrorMsg(e, 12);
+        // reject
+        reject();
+      }
+    });
+  }
+
+  // page exist
+  detectPage(element: string): Promise<boolean> {
+    return new Promise(async (resolve, reject) => {
+      try {
+        // detect page
+        const isSucceeded = await Scrape.page.$(element).then(res => !!res);
+        // resolved
+        resolve(isSucceeded);
 
       } catch (e: unknown) {
         // error

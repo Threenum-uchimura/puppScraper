@@ -20,8 +20,8 @@ import { Scrape } from './class/myScraper'; // scraper
 import { Aggregate } from './class/myAggregator'; // aggregator
 
 // active course ID
-const activeId: string = '202205040501';
-const activeCourseName: string = '東京';
+const activeId: string = '202306030301';
+const activeCourseName: string = '中山';
 
 // netkeiba id
 const netKeibaId: string = process.env.NETKEIBA_ID ?? '';
@@ -36,34 +36,14 @@ const sheetTitleArray: string[][] = [
 const makeEmptyXlsx = (filePath: string): Promise<void> => {
   return new Promise(async (resolve, reject) => {
     try {
-      const promise1: Promise<void> = new Promise(async (resolve) => {
-        // if file exists
-        if (fs.existsSync(filePath)) {
-          // delete file
-          fs.unlink(filePath, (err: unknown) => {
-            if (err) throw err;
-            console.log('File is deleted successfully.');
-            // resolved
-            resolve();
-          });
-        } else {
-          // resolved
-          resolve();
-        }
-      });
-      const promise2: Promise<void> = new Promise(async (resolve) => {
         // create empty file
         fs.writeFile(filePath, '', (err: unknown) => {
           if (err) throw err;
           console.log('File is created successfully.');
+          // resolved
+          resolve();
         });
-        // resolved
-        resolve();
-      });
-      Promise.all([promise1, promise2]).then((): void => {
-        // resolved
-        resolve();
-      });
+        
     } catch (e: unknown) {
       // error
       console.log(e);
@@ -82,20 +62,21 @@ const aggregator = new Aggregate();
 // main
 (async (): Promise<void> => {
   try {
+    // csv filename
+    const filePath: string = `${OUTPUT_PATH}${activeCourseName}-${activeId}.xlsx`;
+    // make empty csv
+    await makeEmptyXlsx(filePath);
     // course
     const targetCourse: string = activeId.slice(0, -2);
-    // filename
-    const fileName: string = (new Date).toISOString().replace(/[^\d]/g, "").slice(0, 14);
     // base url
     const baseUrl: string = `${DEF_TRAINING_URL}${targetCourse}`;
-    // csv filename
-    const filePath: string = `${OUTPUT_PATH}${activeCourseName}-${fileName}.xlsx`;
+    
     // initialize
     await scraper.init();
     // goto netkeiba
     await scraper.doGo(DEF_NETKEIBA_URL);
     // wait for loading of login button
-    await scraper.doWaitSelector('.Icon_Login', 50000);
+    await scraper.doWaitSelector('.CopyRight', 50000);
     // click login
     await scraper.doClick('.Icon_Login');
     // wait for id/pass input
@@ -110,8 +91,7 @@ const aggregator = new Aggregate();
     await scraper.doClick('.loginBtn__wrap input');
     // wait 3 sec
     await scraper.doWaitFor(3000);
-    // make empty csv
-    await makeEmptyXlsx(filePath);
+    
     // init
     await aggregator.init(filePath);
     // loop each races
@@ -128,6 +108,7 @@ const aggregator = new Aggregate();
       await scraper.doWaitSelector('.Horse_Info', 10000);
       // loop each horses
       for (let i: number = 1; i <= 18; i++) {
+        if(await scraper.detectPage(`.OikiriDataHead${i}`)){
         Promise.all([
           // horse name
           scraper.doSingleEval(`.OikiriDataHead${i} .Horse_Info .Horse_Name a`, 'innerHTML'),
@@ -143,6 +124,7 @@ const aggregator = new Aggregate();
           scraper.doSingleEval(`.OikiriDataHead${i} td:nth-child(12)`, 'innerHTML'),
         ]).then((array1: string[]): void => {
           // push results
+          console.log(array1);
           postArray.push(array1);
         });
         // rap time
@@ -157,6 +139,7 @@ const aggregator = new Aggregate();
           });
         // wait 0.5 sec
         await scraper.doWaitFor(500);
+        }
       }
       // push data
       await aggregator.writeData(sheetTitleArray, postArray, raceName);
